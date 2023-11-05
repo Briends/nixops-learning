@@ -37,11 +37,47 @@
               languages.nix.enable = true;
         
               packages = with pkgs; [
+                nix
                 nixops_unstable
               ];
 
             };
         };
-      }).config.flake;
+      }).config.flake // { 
+        nixopsConfigurations.default = 
+          let
+            domain = "${credentials.project}.briends.com";
+            keyjson = builtins.fromJSON (builtins.readFile "/Users/jloos/Developer/nixops-learning/ai-playground-c437-707226309d66.json");
+            credentials = {
+              project = keyjson.project_id;
+              serviceAccount = keyjson.client_email;
+              accessKey = keyjson.private_key;
+            };
+          
+          in {
+            inherit nixpkgs;
+            network.description = domain;
+            network.storage.legacy.databasefile = "./deployments.nixops";
+            
+            resources.gceNetworks.web = credentials // {
+              firewall = {
+                allow-http = {
+                  allowed.tcp = [ 80 ];
+                  sourceRanges =  ["0.0.0.0/0"];
+                };
+                allow-ssh = {
+                  allowed.tcp = [ 22 ];
+                  sourceRanges =  ["0.0.0.0/0"];
+                };
+              };
+            };
+
+            defaults._module.args = {
+              inherit domain credentials;
+            };
+            
+            hello = import ./hello-world.nix;
+          };
+      };
 }
 
